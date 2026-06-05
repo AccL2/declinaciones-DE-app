@@ -37,7 +37,6 @@ def fetch_next_card():
     response = supabase.table("german_flashcards").select("*").execute()
     if response.data and len(response.data) > 0:
         st.session_state.current_card = random.choice(response.data)
-        # RESET OBLIGATORIO: Apagamos la solución para la nueva tarjeta
         st.session_state.show_solution = False
     else:
         st.session_state.current_card = None
@@ -49,17 +48,16 @@ if st.session_state.current_card is None:
 if st.session_state.current_card:
     card = st.session_state.current_card
     
-    # Línea 1: Limpio, sin textos raros de géneros. Solo la palabra tal cual venga en la BD
-    st.markdown(f"🔫 **RONDA {st.session_state.ronda_num} — Tarjeta: {card['word']}**")
+    # Línea 1: Título de ronda limpio
+    st.markdown(f"### 🔫 RONDA {st.session_state.ronda_num} — Tarjeta: {card['word']}")
     
-    # Línea 2: Situación
+    # Línea 2: Situación en cursiva
     st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card['situation']}")
     
-    # Línea 3: Frase en castellano MÁS GRANDE (Usando h3 en markdown)
-    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp; ### **\"{card['spanish_phrase']}\"**")
+    # Línea 3: Frase en castellano (Formato gigante limpio con HTML)
+    st.markdown(f'<div style="font-size: 24px; font-weight: bold; margin-left: 25px; margin-top: 10px; margin-bottom: 15px;">"{card["spanish_phrase"]}"</div>', unsafe_allow_html=True)
     
     # Botonera
-    st.markdown("")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("👁️ Revelar", use_container_width=True):
@@ -74,8 +72,8 @@ if st.session_state.current_card:
     # BLOQUE DE REVELACIÓN (Solo si se ha pulsado Revelar)
     if st.session_state.show_solution:
         st.markdown("") 
-        # Solución alemana MÁS GRANDE e impactante
-        st.markdown(f"## 🔊 **DE:** `{card['german_solution']}`")
+        # Solución alemana MÁS GRANDE e impactante (Usando h2 limpio)
+        st.markdown(f"## 🔊 DE: `{card['german_solution']}`")
         # Explicación justo abajo
         st.markdown(f"({card['explanation']})")
 
