@@ -1,0 +1,1 @@
+# declinaciones-DE-app
