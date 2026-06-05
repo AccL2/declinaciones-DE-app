@@ -2,16 +2,16 @@ import streamlit as st
 from supabase import create_client, Client
 import random
 
-# 1. Configuración de la página
+# 1. Configuración de la página e inyección de estilos limpios
 st.set_page_config(page_title="Tiroteo de Alemán", page_icon="🔫", layout="centered")
 
-# Ocultar menús de Streamlit para máxima inmersión limpia
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    div.block-container {padding-top: 2rem;}
+    div.block-container {padding-top: 2rem; max-width: 700px;}
+    p {margin-bottom: 0.5rem !important;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -42,44 +42,34 @@ def fetch_next_card():
 if st.session_state.current_card is None:
     fetch_next_card()
 
-# 5. INTERFAZ VISUAL ESTILO "RONDA DE TIRO" (Tu captura de pantalla)
-st.title("⚡ Sistema de Tiroteo Alemán")
-st.markdown("---")
-
+# 5. INTERFAZ VISUAL: CALCO DE TU FORMATO DE CHAT
 if st.session_state.current_card:
     card = st.session_state.current_card
     
-    # Cabecera estilo Ronda (Ej: 🔫 RONDA X — Tarjeta: Kaffee)
-    st.markdown(f"### 🔫 TARJETA EN CURSO: `{card['word']}` ({card['gender']})")
+    # Línea 1: El encabezado con la palabra
+    st.markdown(f"🔫 **TARJETA: {card['word']} ({card['gender']})**")
     
-    # Sección Situación con viñeta limpia
-    st.markdown(f"""
-    * &nbsp;&nbsp; ***Situación:*** {card['situation']}
-      **"{card['spanish_phrase']}"**
-    """)
+    # Línea 2 y 3: Situación y Frase en español (Línea a línea, pegado)
+    st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card['situation']}")
+    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp; **\"{card['spanish_phrase']}\"**")
     
-    st.info(f"💡 Estado mental / Modo:")
-    st.markdown("---")
-    
-    # Botonera de control
-    col1, col2 = st.columns(2)
+    # Pequeño espacio para la botonera
+    st.markdown("")
+    col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button("👁️ Revelar la Bala", use_container_width=True):
+        if st.button("👁️ Revelar", use_container_width=True):
             st.session_state.show_solution = True
             st.rerun()
-            
     with col2:
-        if st.button("🚀 Siguiente Bala", type="primary", use_container_width=True):
+        if st.button("🚀 Siguiente", type="primary", use_container_width=True):
             fetch_next_card()
             st.rerun()
 
-    # BLOQUE DE SOLUCIÓN: Copia exacta del formato de tu imagen
+    # BLOQUE DE REVELACIÓN: Tu formato exacto línea a línea
     if st.session_state.show_solution:
-        st.markdown(" ") # Espaciador
-        # La bala en alemán (Formato código en gris destacado)
-        st.markdown(f"### 🔊 **La bala en alemán:** `{card['german_solution']}`")
-        # El fogonazo mental explicativo en cursiva abajo
-        st.markdown(f"*{card['explanation']}*")
+        st.markdown("") # Separador sutil
+        st.markdown(f"🔊 **DE:** `{card['german_solution']}`")
+        st.markdown(f"({card['explanation']})")
 
 else:
     st.error("El cargador está vacío. Revisa tu tabla en Supabase.")
