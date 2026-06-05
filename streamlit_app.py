@@ -31,12 +31,18 @@ if "show_solution" not in st.session_state:
 
 # 4. Función lógica: Traer la tarjeta más antigua del bucle
 def fetch_next_card():
-    # Buscamos la fila que se haya visto hace más tiempo (last_viewed más antiguo o NULL)
+    # Ordenamos de forma limpia por la fecha de última vista
     response = supabase.table("german_flashcards") \
         .select("*") \
-        .order("last_viewed", nulls_first=True, ascending=True) \
+        .order("last_viewed", ascending=True) \
         .limit(1) \
         .execute()
+    
+    if response.data:
+        st.session_state.current_card = response.data[0]
+        st.session_state.show_solution = False
+    else:
+        st.session_state.current_card = None
     
     if response.data:
         st.session_state.current_card = response.data[0]
