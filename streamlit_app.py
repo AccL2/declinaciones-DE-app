@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import random
 
-# 1. Configuración de la página e inyección de estilos limpios
+# 1. Configuración de la página
 st.set_page_config(page_title="Tiroteo de Alemán", page_icon="🔫", layout="centered")
 
 st.markdown("""
@@ -29,12 +29,15 @@ if "current_card" not in st.session_state:
     st.session_state.current_card = None
 if "show_solution" not in st.session_state:
     st.session_state.show_solution = False
+if "ronda_num" not in st.session_state:
+    st.session_state.ronda_num = 1
 
-# 4. Lógica de carga aleatoria
+# 4. Lógica de carga aleatoria limpia
 def fetch_next_card():
     response = supabase.table("german_flashcards").select("*").execute()
     if response.data and len(response.data) > 0:
         st.session_state.current_card = random.choice(response.data)
+        # RESET OBLIGATORIO: Apagamos la solución para la nueva tarjeta
         st.session_state.show_solution = False
     else:
         st.session_state.current_card = None
@@ -42,33 +45,38 @@ def fetch_next_card():
 if st.session_state.current_card is None:
     fetch_next_card()
 
-# 5. INTERFAZ VISUAL: CALCO DE TU FORMATO DE CHAT
+# 5. INTERFAZ VISUAL MAQUETADA LÍNEA A LÍNEA
 if st.session_state.current_card:
     card = st.session_state.current_card
     
-    # Línea 1: El encabezado con la palabra
-    st.markdown(f"🔫 **TARJETA: {card['word']} ({card['gender']})**")
+    # Línea 1: Limpio, sin textos raros de géneros. Solo la palabra tal cual venga en la BD
+    st.markdown(f"🔫 **RONDA {st.session_state.ronda_num} — Tarjeta: {card['word']}**")
     
-    # Línea 2 y 3: Situación y Frase en español (Línea a línea, pegado)
+    # Línea 2: Situación
     st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card['situation']}")
-    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp; **\"{card['spanish_phrase']}\"**")
     
-    # Pequeño espacio para la botonera
+    # Línea 3: Frase en castellano MÁS GRANDE (Usando h3 en markdown)
+    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp; ### **\"{card['spanish_phrase']}\"**")
+    
+    # Botonera
     st.markdown("")
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns(2)
     with col1:
         if st.button("👁️ Revelar", use_container_width=True):
             st.session_state.show_solution = True
             st.rerun()
     with col2:
         if st.button("🚀 Siguiente", type="primary", use_container_width=True):
+            st.session_state.ronda_num += 1
             fetch_next_card()
             st.rerun()
 
-    # BLOQUE DE REVELACIÓN: Tu formato exacto línea a línea
+    # BLOQUE DE REVELACIÓN (Solo si se ha pulsado Revelar)
     if st.session_state.show_solution:
-        st.markdown("") # Separador sutil
-        st.markdown(f"🔊 **DE:** `{card['german_solution']}`")
+        st.markdown("") 
+        # Solución alemana MÁS GRANDE e impactante
+        st.markdown(f"## 🔊 **DE:** `{card['german_solution']}`")
+        # Explicación justo abajo
         st.markdown(f"({card['explanation']})")
 
 else:
