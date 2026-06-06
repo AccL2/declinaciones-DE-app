@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import random
 
-# Configuración de la página
+# 1. Configuración de la página
 st.set_page_config(page_title="Tiroteo de Alemán", page_icon="🔫", layout="centered")
 
 st.markdown("""
@@ -17,7 +17,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Conexión a Supabase
+# 2. Conexión a Supabase
 @st.cache_resource
 def init_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
@@ -33,7 +33,7 @@ GENERO_COLORES = {
     "Plural": "#8b5cf6"
 }
 
-# Barra lateral con filtros
+# 3. Filtros en la Barra Lateral
 st.sidebar.title("🎯 Configurar Tiroteo")
 
 filtro_dificultad = st.sidebar.selectbox(
@@ -57,7 +57,7 @@ if st.session_state.prev_diff != filtro_dificultad or st.session_state.prev_case
     st.session_state.ronda_num = 1
     st.session_state.current_card = None
 
-# Inicializar estados de la sesión
+# 4. Inicializar estados de la sesión
 if "current_card" not in st.session_state:
     st.session_state.current_card = None
 if "show_solution" not in st.session_state:
@@ -71,6 +71,7 @@ def fetch_next_card():
         query = query.eq("difficulty", filtro_dificultad)
     if filtro_caso != "Todos":
         query = query.eq("case", filtro_caso)
+    
     response = query.execute()
     if response.data and len(response.data) > 0:
         st.session_state.current_card = random.choice(response.data)
@@ -81,26 +82,26 @@ def fetch_next_card():
 if st.session_state.current_card is None:
     fetch_next_card()
 
-# Interfaz visual principal
+# 5. Interfaz visual maquetada línea a línea
 if st.session_state.current_card:
     card = st.session_state.current_card
-    color_genero = GENERO_COLORES.get(card["gender"], "#6b7280")
+    color_genero = GENERO_COLORES.get(card.get("gender"), "#6b7280")
     
-    st.markdown(f"### 🔫 RONDA {st.session_state.ronda_num} — Palabra: **{card['word']}**")
+    st.markdown(f"### 🔫 RONDA {st.session_state.ronda_num} — Palabra: **{card.get('word')}**")
     
     st.markdown(f"""
         <div class="badge-container">
-            <span class="badge" style="background-color: {color_genero};">{card['gender'].upper()}</span>
-            <span class="badge" style="background-color: #4b5563;">{card['case'].upper()}</span>
-            <span class="badge" style="background-color: #1f2937;">{card['difficulty'].upper()}</span>
+            <span class="badge" style="background-color: {color_genero};">{str(card.get('gender')).upper()}</span>
+            <span class="badge" style="background-color: #4b5563;">{str(card.get('case')).upper()}</span>
+            <span class="badge" style="background-color: #1f2937;">{str(card.get('difficulty')).upper()}</span>
         </div>
     """, unsafe_allow_html=True)
     
     if card.get("subcategory"):
-        st.markdown(f"**Categoría:** *{card['subcategory']}*")
-    st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card['situation']}")
+        st.markdown(f"**Categoría:** *{card.get('subcategory')}*")
+    st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card.get('situation')}")
     
-    st.markdown(f'<div style="font-size: 24px; font-weight: bold; margin-left: 10px; margin-top: 10px; margin-bottom: 20px; border-left: 4px solid {color_genero}; padding-left: 15px;">"{card["spanish_phrase"]}"</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size: 24px; font-weight: bold; margin-left: 10px; margin-top: 10px; margin-bottom: 20px; border-left: 4px solid {color_genero}; padding-left: 15px;">"{card.get("spanish_phrase")}"</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -115,14 +116,12 @@ if st.session_state.current_card:
 
     if st.session_state.show_solution:
         st.markdown("---")
-        st.markdown(f"## 🔊 DE: `{card['german_solution']}`")
+        st.markdown(f"## 🔊 DE: `{card.get('german_solution')}`")
         
-        # Leemos la explicación (pruebe minúscula o mayúscula por seguridad)
         explicacion_texto = card.get('explanation') or card.get('Explanation')
         if explicacion_texto:
             st.info(f"💡 **Explicación:** {explicacion_texto}")
             
-        # Leemos el tip de gramática solo si no es null o vacío
         tip_texto = card.get('grammar_tip') or card.get('Grammar_tip')
         if tip_texto and str(tip_texto).strip().lower() != 'none':
             st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
