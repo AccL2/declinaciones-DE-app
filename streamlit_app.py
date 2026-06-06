@@ -2,20 +2,13 @@ import streamlit as st
 from supabase import create_client, Client
 import random
 
-# 1. Configuración de la página
-st.set_page_config(page_title="Tiroteo de Alemán", page_icon="🔫", layout="centered")
-
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    div.block-container {padding-top: 2rem; max-width: 700px;}
-    p {margin-bottom: 0.5rem !important;}
-    .badge-container {display: flex; gap: 8px; margin-bottom: 15px;}
-    .badge {padding: 4px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; color: white;}
-    </style>
-    """, unsafe_allow_html=True)
+# 1. Configuración de la página (Dejamos los menús por defecto activos)
+st.set_page_config(
+    page_title="Tiroteo de Alemán", 
+    page_icon="🔫", 
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
 # 2. Conexión a Supabase
 @st.cache_resource
@@ -25,13 +18,6 @@ def init_supabase() -> Client:
     return create_client(url, key)
 
 supabase = init_supabase()
-
-GENERO_COLORES = {
-    "Masculino": "#3b82f6",
-    "Femenino": "#ec4899",
-    "Neutro": "#10b981",
-    "Plural": "#8b5cf6"
-}
 
 # 3. Filtros en la Barra Lateral
 st.sidebar.title("🎯 Configurar Tiroteo")
@@ -82,51 +68,49 @@ def fetch_next_card():
 if st.session_state.current_card is None:
     fetch_next_card()
 
-# 5. Interfaz visual maquetada línea a línea
+# 5. Interfaz principal usando elementos 100% nativos estables
 if st.session_state.current_card:
     card = st.session_state.current_card
-    color_genero = GENERO_COLORES.get(card.get("gender"), "#6b7280")
     
-    st.markdown(f"### 🔫 RONDA {st.session_state.ronda_num} — Palabra: **{card.get('word')}**")
+    # Cabecera de la ronda
+    st.subheader(f"🔫 RONDA {st.session_state.ronda_num} — Palabra: {card.get('word')}")
     
-    st.markdown(f"""
-        <div class="badge-container">
-            <span class="badge" style="background-color: {color_genero};">{str(card.get('gender')).upper()}</span>
-            <span class="badge" style="background-color: #4b5563;">{str(card.get('case')).upper()}</span>
-            <span class="badge" style="background-color: #1f2937;">{str(card.get('difficulty')).upper()}</span>
-        </div>
-    """, unsafe_allow_html=True)
+    # Etiquetas en formato texto simple pero limpio
+    st.write(f"🔹 **Género:** {card.get('gender')} | **Caso:** {card.get('case')} | **Dificultad:** {card.get('difficulty')}")
     
     if card.get("subcategory"):
-        st.markdown(f"**Categoría:** *{card.get('subcategory')}*")
-    st.markdown(f"◦ &nbsp;&nbsp; *Situación:* {card.get('situation')}")
+        st.caption(f"Categoría: {card.get('subcategory')}")
+        
+    st.markdown(f"**Situación:** *{card.get('situation')}*")
     
-    st.markdown(f'<div style="font-size: 24px; font-weight: bold; margin-left: 10px; margin-top: 10px; margin-bottom: 20px; border-left: 4px solid {color_genero}; padding-left: 15px;">"{card.get("spanish_phrase")}"</div>', unsafe_allow_html=True)
+    # Destacamos la frase en español
+    st.info(f"👉 **Frase a traducir:**\n### \"{card.get('spanish_phrase')}\"")
     
+    # Botonera estándar
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("👁️ Revelar", use_container_width=True):
+        if st.button("👁️ Revelar Solución", use_container_width=True):
             st.session_state.show_solution = True
             st.rerun()
     with col2:
-        if st.button("🚀 Siguiente", type="primary", use_container_width=True):
+        if st.button("🚀 Siguiente Tarjeta", type="primary", use_container_width=True):
             st.session_state.ronda_num += 1
             fetch_next_card()
             st.rerun()
 
+    # Bloque de revelación
     if st.session_state.show_solution:
-        st.markdown("---")
-        st.markdown(f"## 🔊 DE: `{card.get('german_solution')}`")
+        st.success(f"### 🔊 Solución en Alemán:\n## `{card.get('german_solution')}`")
         
         explicacion_texto = card.get('explanation') or card.get('Explanation')
         if explicacion_texto:
-            st.info(f"💡 **Explicación:** {explicacion_texto}")
+            st.markdown(f"💡 **Explicación:** {explicacion_texto}")
             
         tip_texto = card.get('grammar_tip') or card.get('Grammar_tip')
         if tip_texto and str(tip_texto).strip().lower() != 'none':
             st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
 else:
-    st.error("No hay tarjetas que coincidan con los filtros seleccionados en la barra lateral.")
-    if st.button("🔄 Recargar / Resetear Filtros"):
+    st.error("No hay tarjetas que coincidan con los filtros de la barra lateral.")
+    if st.button("🔄 Resetear"):
         fetch_next_card()
         st.rerun()
