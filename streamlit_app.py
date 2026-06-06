@@ -116,9 +116,16 @@ if st.session_state.current_card:
     if st.session_state.show_solution:
         st.markdown("---")
         st.markdown(f"## 🔊 DE: `{card['german_solution']}`")
-        st.info(f"💡 Explicación:")
-        if card.get("grammar_tip"):
-            st.warning(f"🔑 Grammar Tip:")
+        
+        # Leemos la explicación (pruebe minúscula o mayúscula por seguridad)
+        explicacion_texto = card.get('explanation') or card.get('Explanation')
+        if explicacion_texto:
+            st.info(f"💡 **Explicación:** {explicacion_texto}")
+            
+        # Leemos el tip de gramática solo si no es null o vacío
+        tip_texto = card.get('grammar_tip') or card.get('Grammar_tip')
+        if tip_texto and str(tip_texto).strip().lower() != 'none':
+            st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
 else:
     st.error("No hay tarjetas que coincidan con los filtros seleccionados en la barra lateral.")
     if st.button("🔄 Recargar / Resetear Filtros"):
