@@ -447,19 +447,17 @@ with tab1:
                         
             with fb_col1:
                 if st.button("😰 Difícil", key=f"diff_{card_id}", use_container_width=True):
-                    # 1. Guardar en los estados locales
                     st.session_state.cards_difficult.add(card_id)
                     st.session_state.cards_studied.discard(card_id)
                     st.session_state.cards_mastered.discard(card_id)
-                    # 2. Guardar en la Base de Datos
                     save_progress_to_db(card_id, 'difficult')
                     update_streak()
                     st.toast("😰 Marcada como difícil. ¡Sigue practicando!", icon="📌")
                     
-                    # 3. ¡EL TRUCO! Avanzar ronda y limpiar la tarjeta ACTUAL antes del rerun
+                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
                     st.session_state.ronda_num += 1
-                    st.session_state.current_card = None  # Esto obliga a elegir una nueva sin arrastrar fantasmas
                     st.session_state.show_solution = False
+                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
                     st.rerun()
                         
             with fb_col2:
@@ -471,10 +469,10 @@ with tab1:
                     update_streak()
                     st.toast("👍 ¡Bien hecho!", icon="✨")
                     
-                    # 3. ¡EL TRUCO! Avanzar ronda y limpiar la tarjeta ACTUAL antes del rerun
+                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
                     st.session_state.ronda_num += 1
-                    st.session_state.current_card = None
                     st.session_state.show_solution = False
+                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
                     st.rerun()
                         
             with fb_col3:
@@ -486,10 +484,10 @@ with tab1:
                     update_streak()
                     st.toast("🎉 ¡Dominada! Esta no volverá a aparecer en 'Solo pendientes'.", icon="🏆")
                     
-                    # 3. ¡EL TRUCO! Avanzar ronda y limpiar la tarjeta ACTUAL antes del rerun
+                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
                     st.session_state.ronda_num += 1
-                    st.session_state.current_card = None
                     st.session_state.show_solution = False
+                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
                     st.rerun()
     else:
         st.warning("⚠️ No hay tarjetas disponibles con los filtros aplicados.")
