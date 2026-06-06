@@ -80,12 +80,12 @@ if st.session_state.prev_diff != filtro_dificultad or st.session_state.prev_case
 # ============================================
 # 4. LÓGICA DE FILTRADO Y CARGA ALEATORIA
 # ============================================
-if "current_card" not in st.session_state:[cite: 3]
-    st.session_state.current_card = None[cite: 3]
-if "show_solution" not in st.session_state:[cite: 3]
-    st.session_state.show_solution = False[cite: 3]
-if "ronda_num" not in st.session_state:[cite: 3]
-    st.session_state.ronda_num = 1[cite: 3]
+if "current_card" not in st.session_state:
+    st.session_state.current_card = None
+if "show_solution" not in st.session_state:
+    st.session_state.show_solution = False
+if "ronda_num" not in st.session_state:
+    st.session_state.ronda_num = 1
 
 def fetch_next_card():
     # Construimos la query base hacia la tabla
