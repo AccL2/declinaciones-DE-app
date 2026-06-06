@@ -161,6 +161,23 @@ st.sidebar.subheader("📊 Tu Progreso Rápido")
 st.sidebar.metric("👍 Estudiadas (Bien)", len(st.session_state.cards_studied))
 st.sidebar.metric("✅ Dominadas", len(st.session_state.cards_mastered))
 st.sidebar.metric("😰 Difíciles", len(st.session_state.cards_difficult))
+st.sidebar.markdown("---")
+if st.sidebar.button("🗑️ Resetear Todo el Progreso", type="secondary", use_container_width=True):
+    try:
+        # Borra todo el progreso del usuario en Supabase
+        supabase.table("user_progress").delete().eq("user_id", "default_user").execute()
+        
+        # Limpia los contadores en la pantalla actual
+        st.session_state.cards_studied = set()
+        st.session_state.cards_mastered = set()
+        st.session_state.cards_difficult = set()
+        st.session_state.ronda_num = 1
+        st.session_state.current_card = None
+        
+        st.toast("Progress reset successfully!", icon="♻️")
+        st.rerun()
+    except Exception as e:
+        st.sidebar.error(f"Error al resetear: {e}")
 
 # ============================================
 # 6. LÓGICA DE CARGA INTELIGENTE FILTRADA
