@@ -88,25 +88,20 @@ if "ronda_num" not in st.session_state:
     st.session_state.ronda_num = 1
 
 def fetch_next_card():
-    # Construimos la query base hacia la tabla
     query = supabase.table("german_flashcards").select("*")
-    
-    # Aplicamos los filtros seleccionados directamente en la base de datos
     if filtro_dificultad != "Todos":
         query = query.eq("difficulty", filtro_dificultad)
     if filtro_caso != "Todos":
         query = query.eq("case", filtro_caso)
-        
     response = query.execute()
-    
     if response.data and len(response.data) > 0:
-        st.session_state.current_card = random.choice(response.data)[cite: 3]
-        st.session_state.show_solution = False[cite: 3]
+        st.session_state.current_card = random.choice(response.data)
+        st.session_state.show_solution = False
     else:
-        st.session_state.current_card = None[cite: 3]
+        st.session_state.current_card = None
 
-if st.session_state.current_card is None:[cite: 3]
-    fetch_next_card()[cite: 3]
+if st.session_state.current_card is None:
+    fetch_next_card()
 
 # ============================================
 # 5. INTERFAZ VISUAL PRINCIPAL
