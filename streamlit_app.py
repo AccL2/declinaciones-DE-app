@@ -46,17 +46,6 @@ st.html("""
         margin: 10px 0;
         font-weight: 500;
     }
-    .diff-del {
-        background-color: #fee2e2;
-        color: #b91c1c;
-        text-decoration: line-through;
-        padding: 0 2px;
-    }
-    .diff-ins {
-        background-color: #d1fae5;
-        color: #047857;
-        padding: 0 2px;
-    }
     </style>
 """)
 
@@ -118,42 +107,62 @@ def save_progress_to_db(card_id, status):
         st.error(f"Error guardando progreso: {e}")
 
 # ============================================
-# 4. CACHÉ DE TARJETAS (OPTIMIZACIÓN CON JOIN)
+# 4. CACHÉ DE TARJETAS (NUEVO SISTEMA RELACIONAL)
 # ============================================
 @st.cache_data(ttl=300)  # Cache por 5 minutos
 def get_all_cards():
-    """Obtiene las tarjetas cruzando los datos de reglas y vocabulario"""
+    """Obtiene las tarjetas de la BD relacional y las adapta al formato de la app"""
     try:
-        # Hacemos un JOIN usando la sintaxis de Supabase (tablas secundarias entre paréntesis)
-        response = supabase.table("tarjetas_frases").select(
-            "id, dificultad, situation, spanish_phrase, german_solution, "
-            "reglas_gramaticales(caso, explicacion_base, grammar_tip), "
-            "vocabulario(genero, palabra)"
-        ).execute()
+        # Pide a Supabase que traiga la tarjeta y haga el JOIN con vocabulario y reglas
+        response = supabase.table("tarjetas_frases").select("""
+            id,
+            dificultad,
+            situation,
+            spanish_phrase,
+            german_solution,
+            vocabulario (
+                articulo,
+                palabra,
+                genero
+            ),
+            reglas_gramaticales (
+                caso,
+                subcategoria,
+                explicacion_base,
+                grammar_tip
+            )
+        """).execute()
         
-        # Aplanamos el JSON para que el resto del código lo lea de forma sencilla
-        flattened_cards = []
+        if not response.data:
+            return []
+
+        # Convertimos los datos relacionales al formato "plano" que usan tus gráficos y UI
+        formatted_cards = []
         for row in response.data:
-            regla = row.get('reglas_gramaticales') or {}
             vocab = row.get('vocabulario') or {}
+            regla = row.get('reglas_gramaticales') or {}
             
-            card = {
-                "id": row.get('id'),
-                "difficulty": row.get('dificultad'), # Mapeamos a las variables que ya usa tu app
-                "case": regla.get('caso'),
-                "situation": row.get('situation'),
-                "spanish_phrase": row.get('spanish_phrase'),
-                "german_solution": row.get('german_solution'),
-                "explanation": regla.get('explicacion_base'),
-                "grammar_tip": regla.get('grammar_tip'),
-                "gender": vocab.get('genero', 'Masculino'),
-                "word": vocab.get('palabra', '')
-            }
-            flattened_cards.append(card)
+            articulo = vocab.get('articulo', '')
+            palabra = vocab.get('palabra', '')
+            palabra_completa = f"{articulo} {palabra}".strip()
+
+            formatted_cards.append({
+                'id': row.get('id'),
+                'word': palabra_completa,
+                'gender': vocab.get('genero', 'Desconocido'),
+                'case': regla.get('caso', 'Desconocido'),
+                'subcategory': regla.get('subcategoria', ''),
+                'difficulty': row.get('dificultad', 'Básico'),
+                'situation': row.get('situation', ''),
+                'spanish_phrase': row.get('spanish_phrase', ''),
+                'german_solution': row.get('german_solution', ''),
+                'explanation': regla.get('explicacion_base', ''),
+                'grammar_tip': regla.get('grammar_tip', '')
+            })
             
-        return flattened_cards
+        return formatted_cards
     except Exception as e:
-        st.error(f"Error al conectar con las nuevas tablas: {e}")
+        st.error(f"Error al conectar con la base de datos: {e}")
         return []
 
 # ============================================
@@ -189,10 +198,6 @@ if "ronda_num" not in st.session_state:
     st.session_state.ronda_num = 1
 if "feedback_mensaje" not in st.session_state:
     st.session_state.feedback_mensaje = None
-if "user_answer" not in st.session_state:
-    st.session_state.user_answer = ""
-if "is_correct" not in st.session_state:
-    st.session_state.is_correct = None
 
 # Carga inicial de persistencia desde Supabase
 if 'cards_studied' not in st.session_state:
@@ -360,7 +365,7 @@ with st.sidebar.expander("⚙️ Opciones Avanzadas"):
 # 10. LÓGICA DE CARGA OPTIMIZADA CON CACHÉ
 # ============================================
 def fetch_next_card():
-    """Obtiene la siguiente tarjeta según filtros aplicados y columnas reales de Supabase"""
+    """Obtiene la siguiente tarjeta según filtros aplicados"""
     all_cards = get_all_cards()  
         
     if not all_cards:
@@ -369,18 +374,10 @@ def fetch_next_card():
         
     available_cards = all_cards
         
-    # Ajustamos las llaves evaluando tanto en minúsculas como en mayúsculas según tu DB
     if filtro_dificultad != "Todos":
-        available_cards = [
-            c for c in available_cards 
-            if str(c.get('difficulty', c.get('Difficulty', ''))).strip() == filtro_dificultad
-        ]
-        
+        available_cards = [c for c in available_cards if c.get('difficulty') == filtro_dificultad]
     if filtro_caso != "Todos":
-        available_cards = [
-            c for c in available_cards 
-            if str(c.get('case', c.get('Case', ''))).strip() == filtro_caso
-        ]
+        available_cards = [c for c in available_cards if c.get('case') == filtro_caso]
         
     if filtro_modo == "Solo pendientes":
         available_cards = [c for c in available_cards if c['id'] not in st.session_state.cards_mastered]
@@ -401,8 +398,6 @@ def fetch_next_card():
     if available_cards:
         st.session_state.current_card = random.choice(available_cards)
         st.session_state.show_solution = False
-        st.session_state.user_answer = ""
-        st.session_state.is_correct = None
     else:
         st.session_state.current_card = None
 
@@ -466,61 +461,29 @@ with tab1:
                 </div>
             """)
                 
-        # Caja fija de la frase a traducir
-        st.html(f"""
-            <div class="phrase-box" style="border-left: 4px solid {color_genero};">
-                <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
-                "{card.get('spanish_phrase')}"
-            </div>
-        """)
-        
-        # 🆕 MEJORA INTERACTIVA: CAMPO DE ENTRADA PARA EL USUARIO
-        with st.form(key=f"eval_form_{card_id}"):
-            res_usuario = st.text_input(
-                "Escribe tu traducción al alemán:", 
-                placeholder="Ej: Der alte Mann...",
-                disabled=st.session_state.show_solution
-            )
-            btn_evaluar = st.form_submit_button("🛡️ Verificar mi Respuesta", use_container_width=True, disabled=st.session_state.show_solution)
-            
-            if btn_evaluar and res_usuario:
-                st.session_state.user_answer = res_usuario.strip()
-                sol_correcta = str(card.get('german_solution')).strip()
-                
-                # Validación ignorando mayúsculas/minúsculas y espacios en extremos
-                if st.session_state.user_answer.lower() == sol_correcta.lower():
-                    st.session_state.is_correct = True
-                else:
-                    st.session_state.is_correct = False
-                st.session_state.show_solution = True
-                st.rerun()
-
-        # Bloque dinámico de solución revelada
+        # Bloque dinámico: Muestra Español o Alemán manteniendo el formato idéntico
         if st.session_state.show_solution:
-            solucion = card.get('german_solution')
-            if st.session_state.is_correct:
-                st.success(f"🎉 **¡Perfecto!** Tu respuesta coincide con la solución: **{solucion}**")
-            else:
-                # Si escribió algo pero está mal, muestra qué escribió y la correcta
-                if st.session_state.user_answer:
-                    st.error(f"❌ **Incorrecto.** \n\n Tu respuesta: `{st.session_state.user_answer}` \n\n Solución correcta: **{solucion}**")
-                else:
-                    st.html(f"""
-                        <div class="phrase-box" style="border-left: 4px solid {color_genero}; background-color: #f3f4f6;">
-                            <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Solución en Alemán:</span>
-                            "{solucion}"
-                        </div>
-                    """)
-
+            st.html(f"""
+                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
+                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Alemán:</span>
+                    "{card.get('german_solution')}"
+                </div>
+            """)
+        else:
+            st.html(f"""
+                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
+                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
+                    "{card.get('spanish_phrase')}"
+                </div>
+            """)
+                
         # ============================================
         # BOTONERA UNIFICADA Y FIJA (Acciones + Feedback)
         # ============================================
         col1, col2 = st.columns(2)
         with col1:
-            # Botón alternativo si el usuario prefiere no escribir y solo ver la solución directamente
-            if st.button("👁️ Revelar Solución (Sin Escribir)", use_container_width=True, disabled=st.session_state.show_solution):
+            if st.button("👁️ Revelar Solución", use_container_width=True, disabled=st.session_state.show_solution):
                 st.session_state.show_solution = True
-                st.session_state.is_correct = False
                 st.rerun()
         with col2:
             if st.button("🚀 Saltar / Siguiente", type="secondary", use_container_width=True):
@@ -528,15 +491,16 @@ with tab1:
                 fetch_next_card()
                 st.rerun()
         
+        # Espacio mínimo controlado entre filas de botones
         st.write("") 
         
         fb_col1, fb_col2, fb_col3 = st.columns(3)
+        
+        # El estado de activación depende de si se reveló la solución
         bloquear_feedback = not st.session_state.show_solution
                     
         with fb_col1:
-            # Si el usuario falló la validación, este botón se resalta como sugerencia ("primary")
-            tipo_boton_mal = "primary" if (st.session_state.is_correct == False and st.session_state.show_solution) else "secondary"
-            if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True, disabled=bloquear_feedback, type=tipo_boton_mal):
+            if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True, disabled=bloquear_feedback):
                 st.session_state.cards_difficult.add(card_id)
                 st.session_state.cards_studied.discard(card_id)
                 st.session_state.cards_mastered.discard(card_id)
@@ -544,13 +508,14 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "😰 Tarjeta anterior marcada como MAL. ¡A por otra!", "tipo": "error"}
+                
                 st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
                     
         with fb_col2:
-            tipo_boton_bien = "primary" if (st.session_state.is_correct == True and st.session_state.show_solution) else "secondary"
-            if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True, disabled=bloquear_feedback, type=tipo_boton_bien):
+            if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True, disabled=bloquear_feedback):
                 st.session_state.cards_studied.add(card_id)
                 st.session_state.cards_difficult.discard(card_id)
                 st.session_state.cards_mastered.discard(card_id)
@@ -558,12 +523,14 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "👍 ¡Bien hecho! Tarjeta anterior registrada.", "tipo": "info"}
+                
                 st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
                     
         with fb_col3:
-            if st.button("✅ Dominada", key=f"master_{card_id}", use_container_width=True, disabled=bloquear_feedback):
+            if st.button("✅ Dominada", key=f"master_{card_id}", type="secondary", use_container_width=True, disabled=bloquear_feedback):
                 st.session_state.cards_mastered.add(card_id)
                 st.session_state.cards_studied.discard(card_id)
                 st.session_state.cards_difficult.discard(card_id)
@@ -571,7 +538,9 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "🏆 ¡Espectacular! Tarjeta anterior DOMINADA por completo.", "tipo": "success"}
+                
                 st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
 
@@ -580,17 +549,17 @@ with tab1:
         # ============================================
         if st.session_state.show_solution:
             st.markdown("---")
-            explicacion_texto = card.get('explanation') or card.get('Explanation')
+            explicacion_texto = card.get('explanation')
             if explicacion_texto:
                 st.info(f"💡 **Explicación:** {explicacion_texto}")
                         
-            tip_texto = card.get('grammar_tip') or card.get('Grammar_tip')
+            tip_texto = card.get('grammar_tip')
             if tip_texto and str(tip_texto).strip().lower() != 'none':
                 st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
 
     else:
         st.warning("⚠️ No hay tarjetas disponibles con los filtros aplicados.")
-        
+                
         if filtro_modo == "Repasar difíciles" and len(st.session_state.cards_difficult) == 0:
             st.info("💡 No tienes tarjetas marcadas como difíciles. ¡Marca algunas primero!")
         elif filtro_modo == "Solo nuevas":
@@ -711,27 +680,29 @@ with tab2:
             stats_por_caso = []
                         
             for caso in casos:
-                cards_caso = df_cards[df_cards['case'] == caso]
-                                
-                if len(cards_caso) > 0:
-                    card_ids_caso = set(cards_caso['id'].values)
-                                        
-                    dominadas_caso = len(card_ids_caso & st.session_state.cards_mastered)
-                    estudiadas_caso = len(card_ids_caso & st.session_state.cards_studied)
-                    dificiles_caso = len(card_ids_caso & st.session_state.cards_difficult)
-                    total_caso = len(card_ids_caso)
-                    pendientes_caso = total_caso - dominadas_caso - estudiadas_caso - dificiles_caso
-                    porcentaje = round((dominadas_caso / total_caso * 100), 1) if total_caso > 0 else 0
-                                        
-                    stats_por_caso.append({
-                        'Caso': caso,
-                        'Total': total_caso,
-                        '✅ Dominadas': dominadas_caso,
-                        '👍 Estudiadas': estudiadas_caso,
-                        '😰 Difíciles': dificiles_caso,
-                        '⏳ Pendientes': pendientes_caso,
-                        '% Dominio': f"{porcentaje}%"
-                    })
+                # Comprobar si el caso existe en los datos
+                if caso in df_cards['case'].values:
+                    cards_caso = df_cards[df_cards['case'] == caso]
+                                    
+                    if len(cards_caso) > 0:
+                        card_ids_caso = set(cards_caso['id'].values)
+                                            
+                        dominadas_caso = len(card_ids_caso & st.session_state.cards_mastered)
+                        estudiadas_caso = len(card_ids_caso & st.session_state.cards_studied)
+                        dificiles_caso = len(card_ids_caso & st.session_state.cards_difficult)
+                        total_caso = len(card_ids_caso)
+                        pendientes_caso = total_caso - dominadas_caso - estudiadas_caso - dificiles_caso
+                        porcentaje = round((dominadas_caso / total_caso * 100), 1) if total_caso > 0 else 0
+                                            
+                        stats_por_caso.append({
+                            'Caso': caso,
+                            'Total': total_caso,
+                            '✅ Dominadas': dominadas_caso,
+                            '👍 Estudiadas': estudiadas_caso,
+                            '😰 Difíciles': dificiles_caso,
+                            '⏳ Pendientes': pendientes_caso,
+                            '% Dominio': f"{porcentaje}%"
+                        })
                         
             if stats_por_caso:
                 df_stats = pd.DataFrame(stats_por_caso)
@@ -751,21 +722,23 @@ with tab2:
             stats_por_genero = []
                         
             for genero in generos:
-                cards_genero = df_cards[df_cards['gender'] == genero]
-                                
-                if len(cards_genero) > 0:
-                    card_ids_genero = set(cards_genero['id'].values)
-                                        
-                    dominadas_gen = len(card_ids_genero & st.session_state.cards_mastered)
-                    total_gen = len(card_ids_genero)
-                    porcentaje_gen = round((dominadas_gen / total_gen * 100), 1) if total_gen > 0 else 0
-                                        
-                    stats_por_genero.append({
-                        'Género': genero,
-                        'Total': total_gen,
-                        'Dominadas': dominadas_gen,
-                        '% Completado': porcentaje_gen
-                    })
+                # Comprobar si el género existe
+                if genero in df_cards['gender'].values:
+                    cards_genero = df_cards[df_cards['gender'] == genero]
+                                    
+                    if len(cards_genero) > 0:
+                        card_ids_genero = set(cards_genero['id'].values)
+                                            
+                        dominadas_gen = len(card_ids_genero & st.session_state.cards_mastered)
+                        total_gen = len(card_ids_genero)
+                        porcentaje_gen = round((dominadas_gen / total_gen * 100), 1) if total_gen > 0 else 0
+                                            
+                        stats_por_genero.append({
+                            'Género': genero,
+                            'Total': total_gen,
+                            'Dominadas': dominadas_gen,
+                            '% Completado': porcentaje_gen
+                        })
                         
             if stats_por_genero:
                 df_genero = pd.DataFrame(stats_por_genero)
@@ -816,15 +789,16 @@ with tab2:
             peor_porcentaje = 100
                         
             for caso in ["Nominativo", "Acusativo", "Dativo", "Genitivo"]:
-                cards_caso = df_cards[df_cards['case'] == caso]
-                if len(cards_caso) > 0:
-                    card_ids_caso = set(cards_caso['id'].values)
-                    dominadas = len(card_ids_caso & st.session_state.cards_mastered)
-                    porcentaje = (dominadas / len(card_ids_caso) * 100) if len(card_ids_caso) > 0 else 0
-                                        
-                    if porcentaje < peor_porcentaje:
-                        peor_porcentaje = porcentaje
-                        peor_caso = caso
+                if caso in df_cards['case'].values:
+                    cards_caso = df_cards[df_cards['case'] == caso]
+                    if len(cards_caso) > 0:
+                        card_ids_caso = set(cards_caso['id'].values)
+                        dominadas = len(card_ids_caso & st.session_state.cards_mastered)
+                        porcentaje = (dominadas / len(card_ids_caso) * 100) if len(card_ids_caso) > 0 else 0
+                                            
+                        if porcentaje < peor_porcentaje:
+                            peor_porcentaje = porcentaje
+                            peor_caso = caso
                         
             if peor_caso and peor_porcentaje < 50:
                 st.info(f"📖 Tu caso con menor dominio es **{peor_caso}** ({peor_porcentaje:.1f}%). ¡Enfócate en él!")
