@@ -90,7 +90,7 @@ def load_progress_from_db():
             elif status == 'difficult':
                 difficult.add(card_id)
                 
-        return studied, mastered, difficult  # Corregida la sangría para retornar al terminar el bucle
+        return studied, mastered, difficult  
     except:
         return set(), set(), set()
 
@@ -149,6 +149,8 @@ if "show_solution" not in st.session_state:
     st.session_state.show_solution = False
 if "ronda_num" not in st.session_state:
     st.session_state.ronda_num = 1
+if "feedback_mensaje" not in st.session_state:
+    st.session_state.feedback_mensaje = None
 
 # Carga inicial de persistencia desde Supabase
 if 'cards_studied' not in st.session_state:
@@ -317,13 +319,12 @@ with st.sidebar.expander("⚙️ Opciones Avanzadas"):
 # ============================================
 def fetch_next_card():
     """Obtiene la siguiente tarjeta según filtros aplicados"""
-    all_cards = get_all_cards()  # Usa caché para evitar consultas repetidas
+    all_cards = get_all_cards()  
         
     if not all_cards:
         st.session_state.current_card = None
         return
         
-    # Aplicar filtros en memoria
     available_cards = all_cards
         
     if filtro_dificultad != "Todos":
@@ -331,7 +332,6 @@ def fetch_next_card():
     if filtro_caso != "Todos":
         available_cards = [c for c in available_cards if c.get('case') == filtro_caso]
         
-    # Filtros según modo de estudio
     if filtro_modo == "Solo pendientes":
         available_cards = [c for c in available_cards if c['id'] not in st.session_state.cards_mastered]
     elif filtro_modo == "Repasar difíciles":
@@ -348,7 +348,6 @@ def fetch_next_card():
             and c['id'] not in st.session_state.cards_difficult
         ]
         
-    # Seleccionar tarjeta aleatoria o None
     if available_cards:
         st.session_state.current_card = random.choice(available_cards)
         st.session_state.show_solution = False
@@ -373,6 +372,17 @@ with tab1:
         genero = card.get('gender', 'Masculino')
         color_genero = GENERO_COLORES.get(genero, '#6b7280')
                 
+        # Muestra el cartel fijo del resultado anterior si existe
+        if st.session_state.feedback_mensaje:
+            msg = st.session_state.feedback_mensaje
+            if msg["tipo"] == "success":
+                st.success(msg["texto"])
+            elif msg["tipo"] == "error":
+                st.error(msg["texto"])
+            else:
+                st.info(msg["texto"])
+            st.session_state.feedback_mensaje = None
+            
         st.subheader(f"🔫 RONDA {st.session_state.ronda_num} — Palabra: {card.get('word')}")
                 
         # Badges de género, caso y dificultad
@@ -404,10 +414,6 @@ with tab1:
                 </div>
             """)
                 
-        
-                
-        
-                
         # Bloque dinámico: Muestra Español o Alemán manteniendo el formato idéntico
         if st.session_state.show_solution:
             st.html(f"""
@@ -424,6 +430,7 @@ with tab1:
                 </div>
             """)
                 
+        # FILA 1: Botones de Acción Principal
         col1, col2 = st.columns(2)
         with col1:
             if st.button("👁️ Revelar Solución", use_container_width=True):
@@ -435,10 +442,8 @@ with tab1:
                 fetch_next_card()
                 st.rerun()
                 
-        # Bloque de revelación
+        # FILA 2: Bloque de revelación (Explicación + Botones de Feedback)
         if st.session_state.show_solution:
-            
-                        
             explicacion_texto = card.get('explanation') or card.get('Explanation')
             if explicacion_texto:
                 st.info(f"💡 **Explicación:** {explicacion_texto}")
@@ -448,23 +453,22 @@ with tab1:
                 st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
                         
             st.markdown("---")
-            
                         
             fb_col1, fb_col2, fb_col3 = st.columns(3)
                         
             with fb_col1:
-                if st.button("😰 Difícil", key=f"diff_{card_id}", use_container_width=True):
+                if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True):
                     st.session_state.cards_difficult.add(card_id)
                     st.session_state.cards_studied.discard(card_id)
                     st.session_state.cards_mastered.discard(card_id)
                     save_progress_to_db(card_id, 'difficult')
                     update_streak()
-                    st.toast("😰 Marcada como difícil. ¡Sigue practicando!", icon="📌")
                     
-                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
+                    st.session_state.feedback_mensaje = {"texto": "😰 Tarjeta anterior marcada como MAL. ¡A por otra!", "tipo": "error"}
+                    
                     st.session_state.ronda_num += 1
                     st.session_state.show_solution = False
-                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
+                    fetch_next_card()
                     st.rerun()
                         
             with fb_col2:
@@ -474,27 +478,27 @@ with tab1:
                     st.session_state.cards_mastered.discard(card_id)
                     save_progress_to_db(card_id, 'studied')
                     update_streak()
-                    st.toast("👍 ¡Bien hecho!", icon="✨")
                     
-                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
+                    st.session_state.feedback_mensaje = {"texto": "👍 ¡Bien hecho! Tarjeta anterior registrada.", "tipo": "info"}
+                    
                     st.session_state.ronda_num += 1
                     st.session_state.show_solution = False
-                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
+                    fetch_next_card()
                     st.rerun()
                         
             with fb_col3:
-                if st.button("✅ Dominada", key=f"master_{card_id}", type="primary", use_container_width=True):
+                if st.button("✅ Dominada", key=f"master_{card_id}", type="secondary", use_container_width=True):
                     st.session_state.cards_mastered.add(card_id)
                     st.session_state.cards_studied.discard(card_id)
                     st.session_state.cards_difficult.discard(card_id)
                     save_progress_to_db(card_id, 'mastered')
                     update_streak()
-                    st.toast("🎉 ¡Dominada! Esta no volverá a aparecer en 'Solo pendientes'.", icon="🏆")
                     
-                    # Avanzamos la ronda, calculamos la NUEVA tarjeta y reiniciamos la solución
+                    st.session_state.feedback_mensaje = {"texto": "🏆 ¡Espectacular! Tarjeta anterior DOMINADA por completo.", "tipo": "success"}
+                    
                     st.session_state.ronda_num += 1
                     st.session_state.show_solution = False
-                    fetch_next_card()  # <--- Esto fuerza la carga de la siguiente palabra YA
+                    fetch_next_card()
                     st.rerun()
     else:
         st.warning("⚠️ No hay tarjetas disponibles con los filtros aplicados.")
@@ -534,7 +538,6 @@ with tab2:
         
     grafico_col1, grafico_col2 = st.columns(2)
         
-    # GRÁFICO 1: Distribución general (Pie Chart)
     with grafico_col1:
         st.subheader("🎯 Distribución Global")
                 
@@ -563,7 +566,6 @@ with tab2:
         except Exception as e:
             st.error(f"Error al cargar gráfico: {e}")
         
-    # GRÁFICO 2: Progreso por Caso Gramatical (Barras Apiladas)
     with grafico_col2:
         st.subheader("🧠 Dominio por Caso")
                 
@@ -609,7 +611,6 @@ with tab2:
         except Exception as e:
             st.warning(f"Estudia algunas tarjetas para ver estadísticas detalladas. ({e})")
         
-    # TABLA DETALLADA POR CASO GRAMATICAL
     st.markdown("---")
     st.subheader("📋 Detalle por Caso Gramatical")
         
@@ -650,7 +651,6 @@ with tab2:
     except Exception as e:
         st.error(f"Error al generar tabla: {e}")
         
-    # PROGRESO POR GÉNERO
     st.markdown("---")
     st.subheader("🎨 Progreso por Género")
         
@@ -707,7 +707,6 @@ with tab2:
     except Exception as e:
         st.error(f"Error al cargar progreso por género: {e}")
         
-    # RECOMENDACIONES PERSONALIZADAS
     st.markdown("---")
     st.subheader("💡 Recomendaciones Personalizadas")
         
@@ -720,7 +719,6 @@ with tab2:
     if st.session_state.study_streak >= 3:
         st.success(f"🔥 ¡Racha de **{st.session_state.study_streak} días**! ¡No la rompas!")
         
-    # Caso con peor rendimiento
     try:
         all_cards_data = get_all_cards()
         if all_cards_data and total_vistas > 10:
