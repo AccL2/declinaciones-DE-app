@@ -5,7 +5,7 @@ from supabase import create_client, Client
 # ============================================
 # 1. CONFIGURACIÓN Y ESTILOS DE LA PÁGINA
 # ============================================
-st.set_page_config(page_title="Tiroteo de Declinaciones", page_icon="🔫", layout="centered")
+st.set_page_config(page_title="Declinaciones", page_icon="🔫", layout="centered")
 
 st.html("""
     <style>
