@@ -449,7 +449,7 @@ with tab1:
                 st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
                         
             st.markdown("---")
-            st.markdown("### ¿Cómo te ha ido con esta tarjeta?")
+            
                         
             fb_col1, fb_col2, fb_col3 = st.columns(3)
                         
