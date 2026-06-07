@@ -48,16 +48,13 @@ st.html("""
         margin-bottom: 20px;
         font-size: 18px;
     }
-    .solucion-box {
-        background-color: #ecfdf5;
-        border-left: 4px solid #10b981;
-        padding: 15px;
-        border-radius: 6px;
-        margin-top: 15px;
-        margin-bottom: 20px;
-        font-size: 24px;
-        font-weight: bold;
-        color: #065f46;
+    /* El contenedor unificado exacto del script viejo */
+    .phrase-box {
+        font-size: 24px; 
+        font-weight: bold; 
+        margin-top: 15px; 
+        margin-bottom: 25px; 
+        padding-left: 15px;
     }
     </style>
 """)
@@ -65,7 +62,7 @@ st.html("""
 # ============================================
 # 2. CONEXIÓN A SUPABASE
 # ============================================
-@st.cache_resource  # <--- Asegúrate de que termine en 'resource' (sin la 'd')
+@st.cache_resource
 def init_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
@@ -78,9 +75,7 @@ supabase = init_supabase()
 # ============================================
 @st.cache_data(ttl=60)
 def get_cards_from_db():
-    """Trae las frases guardadas en Supabase con sus etiquetas de control"""
     try:
-        # Nota: Asegúrate de que tus columnas en la tabla coincidan con estos nombres
         response = supabase.table("tarjetas_declinaciones").select(
             "id, caso, genero, pista, spanish_phrase, german_solution"
         ).execute()
@@ -138,47 +133,54 @@ def siguiente_tarjeta():
 # ============================================
 # 6. INTERFAZ DE USUARIO PRINCIPAL
 # ============================================
-st.title("🔫 Tiroteo Rápido de Declinaciones (Supabase)")
-st.write("Entrena tu oído con la base de datos activa.")
+st.title("🔫 Tiroteo Rápido de Declinaciones")
+st.write("Di la solución en voz alta, compárala con el mismo formato e identifícala visualmente.")
 st.markdown("---")
 
 if st.session_state.tarjeta_actual:
     item = st.session_state.tarjeta_actual
-
-    # Arriba: Palabra base/pista del caso sacada de la BD
-    # El .upper() asegura que 'MASCULINO', 'NEUTRO', etc., queden uniformes
     genero_formateado = str(item['genero']).upper() 
     caso_formateado = str(item['caso']).capitalize()
 
+    # Arriba: Pista visual
     st.html(f"""
         <div class="pista-box">
             💡 Base a usar: <b>{item.get('pista', f"{caso_formateado} {genero_formateado}")}</b>
         </div>
     """)
 
-    # En medio: Frase reto en castellano
-    st.write("### Frase en castellano:")
-    st.markdown(f"## *{item['spanish_phrase']}*")
-
-    # Botonera de acción única
-    if not st.session_state.revelado:
-        if st.button("👁️ Ver solución en alemán", type="primary", use_container_width=True):
-            st.session_state.revelado = True
-            st.rerun()
-    else:
+    # CENTRO: BLOQUE DINÁMICO UNIFICADO (Castellano y Alemán en el mismo sitio y formato)
+    # Cambia dinámicamente el color del borde de azul (#3b82f6) a verde (#10b981) según el estado
+    if st.session_state.revelado:
         st.html(f"""
-            <div class="solucion-box">
-                🇩🇪 {item['german_solution']}
+            <div class="phrase-box" style="border-left: 4px solid #10b981;">
+                <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Alemán:</span>
+                "{item['german_solution']}"
             </div>
         """)
-        if st.button("🚀 Siguiente frase aleatoria", use_container_width=True):
+    else:
+        st.html(f"""
+            <div class="phrase-box" style="border-left: 4px solid #3b82f6;">
+                <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
+                "{item['spanish_phrase']}"
+            </div>
+        """)
+
+    # Botonera fija de acciones justo debajo
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👁️ Dar a solución", type="primary", use_container_width=True, disabled=st.session_state.revelado):
+            st.session_state.revelado = True
+            st.rerun()
+    with col2:
+        if st.button("🚀 Siguiente frase", use_container_width=True):
             siguiente_tarjeta()
             st.rerun()
 
     st.markdown("---")
 
     # ============================================
-    # 7. MAPA VISUAL INTERACTIVO CON FILTRO DE ADJETIVOS
+    # 7. MAPA VISUAL INTERACTIVO
     # ============================================
     st.subheader("🗺️ Localizador en Matriz")
     seleccion = st.radio(
@@ -199,7 +201,6 @@ if st.session_state.tarjeta_actual:
     casos_orden = ["Nominativo", "Acusativo", "Dativo", "Genitivo"]
     generos_orden = ["MASCULINO", "NEUTRO", "FEMENINO", "PLURAL"]
 
-    # Construcción de la tabla dinámica en HTML
     html_render = """
     <table class="tabla-container">
         <tr>
@@ -214,7 +215,6 @@ if st.session_state.tarjeta_actual:
     for caso in casos_orden:
         html_render += f"<tr><td class='tabla-header'>{caso}</td>"
         for gen in generos_orden:
-            # Aquí se activa el color si coincide la celda con los metadatos de la frase de Supabase
             if caso_formateado == caso and genero_formateado == gen:
                 clase = "celda-activa"
             else:
@@ -228,7 +228,4 @@ if st.session_state.tarjeta_actual:
     st.html(html_render)
 
 else:
-    st.warning("⚠️ No se encontraron frases en la tabla `tarjetas_declinaciones` de Supabase. Revisa la base de datos o limpia la caché.")
-    if st.button("🔄 Forzar recarga"):
-        st.cache_data.clear()
-        st.rerun()
+    st.warning("⚠️ No se encontraron frases en la tabla `tarjetas_declinaciones` de Supabase.")
