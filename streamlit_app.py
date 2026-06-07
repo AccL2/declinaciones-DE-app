@@ -133,7 +133,7 @@ def siguiente_tarjeta():
 # ============================================
 # 6. INTERFAZ DE USUARIO PRINCIPAL
 # ============================================
-st.title("🔫 Tiroteo Rápido de Declinaciones")
+st.title("🔫 Declinaciones")
 st.write("Di la solución en voz alta, compárala con el mismo formato e identifícala visualmente.")
 st.markdown("---")
 
