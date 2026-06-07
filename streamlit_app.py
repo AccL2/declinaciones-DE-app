@@ -118,15 +118,42 @@ def save_progress_to_db(card_id, status):
         st.error(f"Error guardando progreso: {e}")
 
 # ============================================
-# 4. CACHÉ DE TARJETAS (OPTIMIZACIÓN)
+# 4. CACHÉ DE TARJETAS (OPTIMIZACIÓN CON JOIN)
 # ============================================
 @st.cache_data(ttl=300)  # Cache por 5 minutos
 def get_all_cards():
-    """Obtiene todas las tarjetas de la base de datos con caché"""
+    """Obtiene las tarjetas cruzando los datos de reglas y vocabulario"""
     try:
-        response = supabase.table("german_flashcards").select("*").execute()
-        return response.data if response.data else []
-    except:
+        # Hacemos un JOIN usando la sintaxis de Supabase (tablas secundarias entre paréntesis)
+        response = supabase.table("tarjetas_frases").select(
+            "id, dificultad, situation, spanish_phrase, german_solution, "
+            "reglas_gramaticales(caso, explicacion_base, grammar_tip), "
+            "vocabulario(genero, palabra)"
+        ).execute()
+        
+        # Aplanamos el JSON para que el resto del código lo lea de forma sencilla
+        flattened_cards = []
+        for row in response.data:
+            regla = row.get('reglas_gramaticales') or {}
+            vocab = row.get('vocabulario') or {}
+            
+            card = {
+                "id": row.get('id'),
+                "difficulty": row.get('dificultad'), # Mapeamos a las variables que ya usa tu app
+                "case": regla.get('caso'),
+                "situation": row.get('situation'),
+                "spanish_phrase": row.get('spanish_phrase'),
+                "german_solution": row.get('german_solution'),
+                "explanation": regla.get('explicacion_base'),
+                "grammar_tip": regla.get('grammar_tip'),
+                "gender": vocab.get('genero', 'Masculino'),
+                "word": vocab.get('palabra', '')
+            }
+            flattened_cards.append(card)
+            
+        return flattened_cards
+    except Exception as e:
+        st.error(f"Error al conectar con las nuevas tablas: {e}")
         return []
 
 # ============================================
