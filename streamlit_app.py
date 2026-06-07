@@ -333,7 +333,7 @@ with st.sidebar.expander("⚙️ Opciones Avanzadas"):
 # 10. LÓGICA DE CARGA OPTIMIZADA CON CACHÉ
 # ============================================
 def fetch_next_card():
-    """Obtiene la siguiente tarjeta según filtros aplicados"""
+    """Obtiene la siguiente tarjeta según filtros aplicados y columnas reales de Supabase"""
     all_cards = get_all_cards()  
         
     if not all_cards:
@@ -342,10 +342,18 @@ def fetch_next_card():
         
     available_cards = all_cards
         
+    # Ajustamos las llaves evaluando tanto en minúsculas como en mayúsculas según tu DB
     if filtro_dificultad != "Todos":
-        available_cards = [c for c in available_cards if c.get('difficulty') == filtro_dificultad]
+        available_cards = [
+            c for c in available_cards 
+            if str(c.get('difficulty', c.get('Difficulty', ''))).strip() == filtro_dificultad
+        ]
+        
     if filtro_caso != "Todos":
-        available_cards = [c for c in available_cards if c.get('case') == filtro_caso]
+        available_cards = [
+            c for c in available_cards 
+            if str(c.get('case', c.get('Case', ''))).strip() == filtro_caso
+        ]
         
     if filtro_modo == "Solo pendientes":
         available_cards = [c for c in available_cards if c['id'] not in st.session_state.cards_mastered]
