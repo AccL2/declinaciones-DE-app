@@ -363,7 +363,7 @@ if st.session_state.current_card is None:
 tab1, tab2 = st.tabs(["🔫 Tiroteo", "📊 Estadísticas Avanzadas"])
 
 # --------------------------------------------------------
-# PESTAÑA 1: EL JUEGO DE LAS TARJETAS
+# PESTAÑA 1: EL JUEGO DE LAS TARJETAS (CORREGIDA)
 # --------------------------------------------------------
 with tab1:
     if st.session_state.current_card:
@@ -430,10 +430,12 @@ with tab1:
                 </div>
             """)
                 
-        # FILA 1: Botones de Acción Principal
+        # ============================================
+# BOTONERA UNIFICADA Y FIJA (Acciones + Feedback)
+# ============================================
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("👁️ Revelar Solución", use_container_width=True):
+            if st.button("👁️ Revelar Solución", use_container_width=True, disabled=st.session_state.show_solution):
                 st.session_state.show_solution = True
                 st.rerun()
         with col2:
@@ -441,9 +443,65 @@ with tab1:
                 st.session_state.ronda_num += 1
                 fetch_next_card()
                 st.rerun()
+        
+        # Espacio mínimo controlado entre filas de botones
+        st.write("") 
+        
+        fb_col1, fb_col2, fb_col3 = st.columns(3)
+        
+        # El estado de activación depende de si se reveló la solución
+        bloquear_feedback = not st.session_state.show_solution
+                    
+        with fb_col1:
+            if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True, disabled=bloquear_feedback):
+                st.session_state.cards_difficult.add(card_id)
+                st.session_state.cards_studied.discard(card_id)
+                st.session_state.cards_mastered.discard(card_id)
+                save_progress_to_db(card_id, 'difficult')
+                update_streak()
                 
-        # FILA 2: Bloque de revelación (Explicación + Botones de Feedback)
+                st.session_state.feedback_mensaje = {"texto": "😰 Tarjeta anterior marcada como MAL. ¡A por otra!", "tipo": "error"}
+                
+                st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
+                fetch_next_card()
+                st.rerun()
+                    
+        with fb_col2:
+            if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True, disabled=bloquear_feedback):
+                st.session_state.cards_studied.add(card_id)
+                st.session_state.cards_difficult.discard(card_id)
+                st.session_state.cards_mastered.discard(card_id)
+                save_progress_to_db(card_id, 'studied')
+                update_streak()
+                
+                st.session_state.feedback_mensaje = {"texto": "👍 ¡Bien hecho! Tarjeta anterior registrada.", "tipo": "info"}
+                
+                st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
+                fetch_next_card()
+                st.rerun()
+                    
+        with fb_col3:
+            if st.button("✅ Dominada", key=f"master_{card_id}", type="secondary", use_container_width=True, disabled=bloquear_feedback):
+                st.session_state.cards_mastered.add(card_id)
+                st.session_state.cards_studied.discard(card_id)
+                st.session_state.cards_difficult.discard(card_id)
+                save_progress_to_db(card_id, 'mastered')
+                update_streak()
+                
+                st.session_state.feedback_mensaje = {"texto": "🏆 ¡Espectacular! Tarjeta anterior DOMINADA por completo.", "tipo": "success"}
+                
+                st.session_state.ronda_num += 1
+                st.session_state.show_solution = False
+                fetch_next_card()
+                st.rerun()
+
+        # ============================================
+# BLOQUE DE REVELACIÓN (Solo datos informativos)
+# ============================================
         if st.session_state.show_solution:
+            st.markdown("---")
             explicacion_texto = card.get('explanation') or card.get('Explanation')
             if explicacion_texto:
                 st.info(f"💡 **Explicación:** {explicacion_texto}")
@@ -451,55 +509,7 @@ with tab1:
             tip_texto = card.get('grammar_tip') or card.get('Grammar_tip')
             if tip_texto and str(tip_texto).strip().lower() != 'none':
                 st.warning(f"🔑 **Grammar Tip:** {tip_texto}")
-                        
-            st.markdown("---")
-                        
-            fb_col1, fb_col2, fb_col3 = st.columns(3)
-                        
-            with fb_col1:
-                if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True):
-                    st.session_state.cards_difficult.add(card_id)
-                    st.session_state.cards_studied.discard(card_id)
-                    st.session_state.cards_mastered.discard(card_id)
-                    save_progress_to_db(card_id, 'difficult')
-                    update_streak()
-                    
-                    st.session_state.feedback_mensaje = {"texto": "😰 Tarjeta anterior marcada como MAL. ¡A por otra!", "tipo": "error"}
-                    
-                    st.session_state.ronda_num += 1
-                    st.session_state.show_solution = False
-                    fetch_next_card()
-                    st.rerun()
-                        
-            with fb_col2:
-                if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True):
-                    st.session_state.cards_studied.add(card_id)
-                    st.session_state.cards_difficult.discard(card_id)
-                    st.session_state.cards_mastered.discard(card_id)
-                    save_progress_to_db(card_id, 'studied')
-                    update_streak()
-                    
-                    st.session_state.feedback_mensaje = {"texto": "👍 ¡Bien hecho! Tarjeta anterior registrada.", "tipo": "info"}
-                    
-                    st.session_state.ronda_num += 1
-                    st.session_state.show_solution = False
-                    fetch_next_card()
-                    st.rerun()
-                        
-            with fb_col3:
-                if st.button("✅ Dominada", key=f"master_{card_id}", type="secondary", use_container_width=True):
-                    st.session_state.cards_mastered.add(card_id)
-                    st.session_state.cards_studied.discard(card_id)
-                    st.session_state.cards_difficult.discard(card_id)
-                    save_progress_to_db(card_id, 'mastered')
-                    update_streak()
-                    
-                    st.session_state.feedback_mensaje = {"texto": "🏆 ¡Espectacular! Tarjeta anterior DOMINADA por completo.", "tipo": "success"}
-                    
-                    st.session_state.ronda_num += 1
-                    st.session_state.show_solution = False
-                    fetch_next_card()
-                    st.rerun()
+
     else:
         st.warning("⚠️ No hay tarjetas disponibles con los filtros aplicados.")
                 
