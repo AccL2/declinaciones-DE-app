@@ -407,7 +407,7 @@ with tab1:
         if card.get("subcategory"):
             st.caption(f"Categoría: {card.get('subcategory')}")
                 
-        st.markdown(f"**Situación:** *{card.get('situation')}*")
+        
                 
         # Bloque dinámico: Muestra Español o Alemán manteniendo el formato idéntico
         if st.session_state.show_solution:
