@@ -46,6 +46,17 @@ st.html("""
         margin: 10px 0;
         font-weight: 500;
     }
+    .diff-del {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        text-decoration: line-through;
+        padding: 0 2px;
+    }
+    .diff-ins {
+        background-color: #d1fae5;
+        color: #047857;
+        padding: 0 2px;
+    }
     </style>
 """)
 
@@ -151,6 +162,10 @@ if "ronda_num" not in st.session_state:
     st.session_state.ronda_num = 1
 if "feedback_mensaje" not in st.session_state:
     st.session_state.feedback_mensaje = None
+if "user_answer" not in st.session_state:
+    st.session_state.user_answer = ""
+if "is_correct" not in st.session_state:
+    st.session_state.is_correct = None
 
 # Carga inicial de persistencia desde Supabase
 if 'cards_studied' not in st.session_state:
@@ -351,6 +366,8 @@ def fetch_next_card():
     if available_cards:
         st.session_state.current_card = random.choice(available_cards)
         st.session_state.show_solution = False
+        st.session_state.user_answer = ""
+        st.session_state.is_correct = None
     else:
         st.session_state.current_card = None
 
@@ -363,7 +380,7 @@ if st.session_state.current_card is None:
 tab1, tab2 = st.tabs(["🔫 Tiroteo", "📊 Estadísticas Avanzadas"])
 
 # --------------------------------------------------------
-# PESTAÑA 1: EL JUEGO DE LAS TARJETAS (CORREGIDA)
+# PESTAÑA 1: EL JUEGO DE LAS TARJETAS
 # --------------------------------------------------------
 with tab1:
     if st.session_state.current_card:
@@ -414,29 +431,61 @@ with tab1:
                 </div>
             """)
                 
-        # Bloque dinámico: Muestra Español o Alemán manteniendo el formato idéntico
-        if st.session_state.show_solution:
-            st.html(f"""
-                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
-                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Alemán:</span>
-                    "{card.get('german_solution')}"
-                </div>
-            """)
-        else:
-            st.html(f"""
-                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
-                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
-                    "{card.get('spanish_phrase')}"
-                </div>
-            """)
+        # Caja fija de la frase a traducir
+        st.html(f"""
+            <div class="phrase-box" style="border-left: 4px solid {color_genero};">
+                <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
+                "{card.get('spanish_phrase')}"
+            </div>
+        """)
+        
+        # 🆕 MEJORA INTERACTIVA: CAMPO DE ENTRADA PARA EL USUARIO
+        with st.form(key=f"eval_form_{card_id}"):
+            res_usuario = st.text_input(
+                "Escribe tu traducción al alemán:", 
+                placeholder="Ej: Der alte Mann...",
+                disabled=st.session_state.show_solution
+            )
+            btn_evaluar = st.form_submit_button("🛡️ Verificar mi Respuesta", use_container_width=True, disabled=st.session_state.show_solution)
+            
+            if btn_evaluar and res_usuario:
+                st.session_state.user_answer = res_usuario.strip()
+                sol_correcta = str(card.get('german_solution')).strip()
                 
+                # Validación ignorando mayúsculas/minúsculas y espacios en extremos
+                if st.session_state.user_answer.lower() == sol_correcta.lower():
+                    st.session_state.is_correct = True
+                else:
+                    st.session_state.is_correct = False
+                st.session_state.show_solution = True
+                st.rerun()
+
+        # Bloque dinámico de solución revelada
+        if st.session_state.show_solution:
+            solucion = card.get('german_solution')
+            if st.session_state.is_correct:
+                st.success(f"🎉 **¡Perfecto!** Tu respuesta coincide con la solución: **{solucion}**")
+            else:
+                # Si escribió algo pero está mal, muestra qué escribió y la correcta
+                if st.session_state.user_answer:
+                    st.error(f"❌ **Incorrecto.** \n\n Tu respuesta: `{st.session_state.user_answer}` \n\n Solución correcta: **{solucion}**")
+                else:
+                    st.html(f"""
+                        <div class="phrase-box" style="border-left: 4px solid {color_genero}; background-color: #f3f4f6;">
+                            <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Solución en Alemán:</span>
+                            "{solucion}"
+                        </div>
+                    """)
+
         # ============================================
-# BOTONERA UNIFICADA Y FIJA (Acciones + Feedback)
-# ============================================
+        # BOTONERA UNIFICADA Y FIJA (Acciones + Feedback)
+        # ============================================
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("👁️ Revelar Solución", use_container_width=True, disabled=st.session_state.show_solution):
+            # Botón alternativo si el usuario prefiere no escribir y solo ver la solución directamente
+            if st.button("👁️ Revelar Solución (Sin Escribir)", use_container_width=True, disabled=st.session_state.show_solution):
                 st.session_state.show_solution = True
+                st.session_state.is_correct = False
                 st.rerun()
         with col2:
             if st.button("🚀 Saltar / Siguiente", type="secondary", use_container_width=True):
@@ -444,16 +493,15 @@ with tab1:
                 fetch_next_card()
                 st.rerun()
         
-        # Espacio mínimo controlado entre filas de botones
         st.write("") 
         
         fb_col1, fb_col2, fb_col3 = st.columns(3)
-        
-        # El estado de activación depende de si se reveló la solución
         bloquear_feedback = not st.session_state.show_solution
                     
         with fb_col1:
-            if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True, disabled=bloquear_feedback):
+            # Si el usuario falló la validación, este botón se resalta como sugerencia ("primary")
+            tipo_boton_mal = "primary" if (st.session_state.is_correct == False and st.session_state.show_solution) else "secondary"
+            if st.button("😰 Mal", key=f"diff_{card_id}", use_container_width=True, disabled=bloquear_feedback, type=tipo_boton_mal):
                 st.session_state.cards_difficult.add(card_id)
                 st.session_state.cards_studied.discard(card_id)
                 st.session_state.cards_mastered.discard(card_id)
@@ -461,14 +509,13 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "😰 Tarjeta anterior marcada como MAL. ¡A por otra!", "tipo": "error"}
-                
                 st.session_state.ronda_num += 1
-                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
                     
         with fb_col2:
-            if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True, disabled=bloquear_feedback):
+            tipo_boton_bien = "primary" if (st.session_state.is_correct == True and st.session_state.show_solution) else "secondary"
+            if st.button("👍 Bien", key=f"ok_{card_id}", use_container_width=True, disabled=bloquear_feedback, type=tipo_boton_bien):
                 st.session_state.cards_studied.add(card_id)
                 st.session_state.cards_difficult.discard(card_id)
                 st.session_state.cards_mastered.discard(card_id)
@@ -476,14 +523,12 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "👍 ¡Bien hecho! Tarjeta anterior registrada.", "tipo": "info"}
-                
                 st.session_state.ronda_num += 1
-                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
                     
         with fb_col3:
-            if st.button("✅ Dominada", key=f"master_{card_id}", type="secondary", use_container_width=True, disabled=bloquear_feedback):
+            if st.button("✅ Dominada", key=f"master_{card_id}", use_container_width=True, disabled=bloquear_feedback):
                 st.session_state.cards_mastered.add(card_id)
                 st.session_state.cards_studied.discard(card_id)
                 st.session_state.cards_difficult.discard(card_id)
@@ -491,15 +536,13 @@ with tab1:
                 update_streak()
                 
                 st.session_state.feedback_mensaje = {"texto": "🏆 ¡Espectacular! Tarjeta anterior DOMINADA por completo.", "tipo": "success"}
-                
                 st.session_state.ronda_num += 1
-                st.session_state.show_solution = False
                 fetch_next_card()
                 st.rerun()
 
         # ============================================
-# BLOQUE DE REVELACIÓN (Solo datos informativos)
-# ============================================
+        # BLOQUE DE REVELACIÓN (Solo datos informativos)
+        # ============================================
         if st.session_state.show_solution:
             st.markdown("---")
             explicacion_texto = card.get('explanation') or card.get('Explanation')
@@ -512,7 +555,7 @@ with tab1:
 
     else:
         st.warning("⚠️ No hay tarjetas disponibles con los filtros aplicados.")
-                
+        
         if filtro_modo == "Repasar difíciles" and len(st.session_state.cards_difficult) == 0:
             st.info("💡 No tienes tarjetas marcadas como difíciles. ¡Marca algunas primero!")
         elif filtro_modo == "Solo nuevas":
