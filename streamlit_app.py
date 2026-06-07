@@ -5,7 +5,7 @@ from supabase import create_client, Client
 # ============================================
 # 1. CONFIGURACIÓN Y ESTILOS DE LA PÁGINA
 # ============================================
-st.set_page_config(page_title="Declinaciones", page_icon="🔫", layout="centered")
+st.set_page_config(page_title="Tiroteo de Declinaciones", page_icon="🔫", layout="centered")
 
 st.html("""
     <style>
@@ -41,14 +41,15 @@ st.html("""
         box-shadow: inset 0 0 8px rgba(239, 68, 68, 0.2);
     }
     .pista-box {
-        background-color: #eff6ff;
-        border-left: 4px solid #3b82f6;
+        background-color: #f3f4f6;
+        border-left: 4px solid #6b7280;
         padding: 12px;
         border-radius: 6px;
         margin-bottom: 20px;
         font-size: 18px;
+        font-weight: bold;
+        color: #1f2937;
     }
-    /* El contenedor unificado exacto del script viejo */
     .phrase-box {
         font-size: 24px; 
         font-weight: bold; 
@@ -133,7 +134,7 @@ def siguiente_tarjeta():
 # ============================================
 # 6. INTERFAZ DE USUARIO PRINCIPAL
 # ============================================
-st.title("🔫 Declinaciones")
+st.title("🔫 Tiroteo Rápido de Declinaciones")
 st.write("Di la solución en voz alta, compárala con el mismo formato e identifícala visualmente.")
 st.markdown("---")
 
@@ -142,15 +143,23 @@ if st.session_state.tarjeta_actual:
     genero_formateado = str(item['genero']).upper() 
     caso_formateado = str(item['caso']).capitalize()
 
-    # Arriba: Pista visual
+    # 🎯 AQUÍ SE LIMPIA LA PISTA: Convierte cualquier caso al artículo base puro (Sustantivo en Nominativo)
+    base_pura = "Der Mann"
+    if genero_formateado == "FEMENINO":
+        base_pura = "Die Frau"
+    elif genero_formateado == "NEUTRO":
+        base_pura = "Das Kind"
+    elif genero_formateado == "PLURAL":
+        base_pura = "Die Kinder"
+
+    # Arriba: Palabra base limpia (Ya no dice 'dem' ni el caso, solo la base)
     st.html(f"""
         <div class="pista-box">
-            💡 Base a usar: <b>{item.get('pista', f"{caso_formateado} {genero_formateado}")}</b>
+            💡 Base a usar: {base_pura}
         </div>
     """)
 
-    # CENTRO: BLOQUE DINÁMICO UNIFICADO (Castellano y Alemán en el mismo sitio y formato)
-    # Cambia dinámicamente el color del borde de azul (#3b82f6) a verde (#10b981) según el estado
+    # CENTRO: Bloque dinámico unificado
     if st.session_state.revelado:
         st.html(f"""
             <div class="phrase-box" style="border-left: 4px solid #10b981;">
@@ -166,7 +175,7 @@ if st.session_state.tarjeta_actual:
             </div>
         """)
 
-    # Botonera fija de acciones justo debajo
+    # Botonera fija de acciones
     col1, col2 = st.columns(2)
     with col1:
         if st.button("👁️ Dar a solución", type="primary", use_container_width=True, disabled=st.session_state.revelado):
