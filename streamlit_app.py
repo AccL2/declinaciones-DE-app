@@ -65,7 +65,7 @@ st.html("""
 # ============================================
 # 2. CONEXIÓN A SUPABASE
 # ============================================
-@st.cache_resourced
+@st.cache_resource  # <--- Asegúrate de que termine en 'resource' (sin la 'd')
 def init_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
