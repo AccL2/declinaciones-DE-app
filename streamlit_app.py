@@ -404,8 +404,7 @@ with tab1:
                 </div>
             """)
                 
-        if card.get("subcategory"):
-            st.caption(f"Categoría: {card.get('subcategory')}")
+        
                 
         
                 
