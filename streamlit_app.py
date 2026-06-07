@@ -409,13 +409,21 @@ with tab1:
                 
         st.markdown(f"**Situación:** *{card.get('situation')}*")
                 
-        # Frase a traducir
-        st.html(f"""
-            <div class="phrase-box" style="border-left: 4px solid {color_genero};">
-                <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
-                "{card.get('spanish_phrase')}"
-            </div>
-        """)
+        # Bloque dinámico: Muestra Español o Alemán manteniendo el formato idéntico
+        if st.session_state.show_solution:
+            st.html(f"""
+                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
+                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Alemán:</span>
+                    "{card.get('german_solution')}"
+                </div>
+            """)
+        else:
+            st.html(f"""
+                <div class="phrase-box" style="border-left: 4px solid {color_genero};">
+                    <span style="color: gray; font-size: 14px; font-weight: normal; display: block; margin-bottom: 4px;">Frase a traducir:</span>
+                    "{card.get('spanish_phrase')}"
+                </div>
+            """)
                 
         col1, col2 = st.columns(2)
         with col1:
@@ -430,7 +438,7 @@ with tab1:
                 
         # Bloque de revelación
         if st.session_state.show_solution:
-            st.success(f"### 🔊 Solución en Alemán:\n## `{card.get('german_solution')}`")
+            
                         
             explicacion_texto = card.get('explanation') or card.get('Explanation')
             if explicacion_texto:
